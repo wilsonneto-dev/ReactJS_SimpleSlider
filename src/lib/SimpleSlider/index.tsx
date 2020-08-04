@@ -1,6 +1,10 @@
-import React, { useState, useCallback, useRef } from "react";
-
-import Controls from "./Controls";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  Component,
+} from "react";
 
 import styles from "./styles.module.css";
 
@@ -10,19 +14,28 @@ enum Directions {
 }
 
 interface ISimpleSliderProps {
-  constrols?: boolean;
+  showConstrols?: boolean;
+  leftConrtol?: Component;
+  rightConrtol?: Component;
+  onChangePercentPosition?: (positionPercent: number) => void;
 }
 
 const SimpleSlider: React.FC<ISimpleSliderProps> = ({
   children,
-  constrols = true,
+  showConstrols = true,
+  leftConrtol = null,
+  rightConrtol = null,
+  onChangePercentPosition = null,
 }) => {
-  const [currentLeftPosition, setCurrentLeftPosition] = useState(0);
-  const [currentPercentualPosition, setCurrentPercentualPosition] = useState(
-    0.0
-  );
   const containerRef = useRef<HTMLDivElement>();
   const contentRef = useRef<HTMLDivElement>();
+
+  const [currentLeftPosition, setCurrentLeftPosition] = useState(0);
+  const [initialDragOffsetLeft, setInitialDragOffsetLeft] = useState(0);
+  const [initialDragEventX, setInitialDragEventX] = useState(0);
+
+  const [currentPercentualPosition, setCurrentPercentualPosition] = useState(0);
+  const [onDragging, setOnDragging] = useState(false);
 
   const moveNextPage = useCallback((direction: Directions) => {
     if (containerRef.current && contentRef.current) {
@@ -48,88 +61,113 @@ const SimpleSlider: React.FC<ISimpleSliderProps> = ({
     }
   }, []);
 
-  let initialOffsetLeft: number;
-  let initialEventX: number;
-
-  const processPreDragUI = () => {
+  const processPostMovmentUI = useCallback(() => {
     if (contentRef.current) {
-      contentRef.current.style.transition = "";
-    }
-  };
+      const containerWidth = containerRef.current?.offsetWidth ?? 0;
+      const contentWidth = contentRef.current?.clientWidth ?? 0;
+      const totalMovimentArea = contentWidth - containerWidth;
 
-  const processPostDragUI = () => {
-    if (contentRef.current) {
-      contentRef.current.style.transition = "all 0.5s";
+      if (currentLeftPosition < totalMovimentArea * -1)
+        setCurrentLeftPosition(totalMovimentArea * -1);
+      else if (currentLeftPosition > 0) setCurrentLeftPosition(0);
     }
-  };
+  }, [currentLeftPosition]);
 
-  const dragStart = (e: any) => {
+  const dragStart = useCallback((e: any) => {
     if (containerRef.current && contentRef.current) {
       const event = (e || window.event) as DragEvent;
-      processPreDragUI();
+      setOnDragging(true);
 
-      initialOffsetLeft = contentRef.current.offsetLeft;
-      initialEventX = event.clientX;
-
-      console.log("-- drag start --");
-      console.log("initialOffsetLeft: " + initialOffsetLeft);
-      console.log("initialEventX: " + initialEventX);
+      setInitialDragOffsetLeft(contentRef.current.offsetLeft);
+      setInitialDragEventX(event.clientX);
     }
-  };
+  }, []);
 
-  const dragEnd = (e: any) => {
-    if (containerRef.current && contentRef.current) {
-      const event = (e || window.event) as DragEvent;
+  const dragEnd = useCallback(
+    (e: any) => {
+      if (containerRef.current && contentRef.current) {
+        const event = (e || window.event) as DragEvent;
+        const movmentOffset = event.clientX - initialDragEventX;
+        const newContentPosition = initialDragOffsetLeft + movmentOffset;
 
-      console.log("-- drag end --");
-
-      const movmentOffset = event.clientX - initialEventX;
-      const newContentPosition = initialEventX - movmentOffset;
-      initialOffsetLeft = newContentPosition;
-
-      // processPostDragUI();
-    }
-  };
-
-  const drag = (e: any) => {
-    if (containerRef.current && contentRef.current) {
-      const event = (e || window.event) as DragEvent;
-      if (e.clientX !== 0) {
-        console.log("-- drag --");
-
-        const movmentOffset = event.clientX - initialOffsetLeft;
-        const newContentPosition = initialEventX + movmentOffset;
-
-        console.log("initialOffsetLeft: " + initialOffsetLeft);
-        console.log("movmentOffset: " + movmentOffset);
-        console.log("newContentPosition: " + newContentPosition);
-
-        contentRef.current.style.left = `${newContentPosition}px`;
-        // setCurrentLeftPosition(newContentPosition);
+        setCurrentLeftPosition(newContentPosition);
+        setOnDragging(false);
       }
-    }
-  };
+    },
+    [initialDragEventX, initialDragOffsetLeft]
+  );
+
+  const updateLeftContentPosition = useCallback(
+    (newContentPosition: number) => {
+      if (contentRef.current) {
+        contentRef.current.style.left = `${newContentPosition}px`;
+      }
+    },
+    []
+  );
+
+  const drag = useCallback(
+    (e: any) => {
+      if (containerRef.current && contentRef.current) {
+        const event = (e || window.event) as DragEvent;
+        if (e.clientX !== 0) {
+          const movmentOffset = event.clientX - initialDragEventX;
+          const newContentPosition = initialDragOffsetLeft + movmentOffset;
+          updateLeftContentPosition(newContentPosition);
+        }
+      }
+    },
+    [initialDragEventX, initialDragOffsetLeft, updateLeftContentPosition]
+  );
+
+  useEffect(() => {
+    console.log("useEffect:currentLeftPosition -> " + currentLeftPosition);
+    processPostMovmentUI();
+  }, [currentLeftPosition, processPostMovmentUI]);
+
+  useEffect(() => {
+    if (onChangePercentPosition)
+      onChangePercentPosition(currentPercentualPosition);
+  }, [currentPercentualPosition, onChangePercentPosition]);
 
   return (
-    <div ref={containerRef as any} className={styles.container}>
+    <div
+      ref={containerRef as any}
+      className={`${styles.container} ${onDragging ? styles.onDragging : ""}`}
+      onDragStart={dragStart}
+      onDragEnd={dragEnd}
+      onDrag={drag}
+    >
       <div
+        style={{ left: currentLeftPosition }}
         ref={contentRef as any}
         className={styles.content}
-        onDragStart={dragStart}
-        onDragEnd={dragEnd}
-        onDrag={drag}
       >
         {children}
       </div>
-      {constrols && (
-        <Controls
-          next={() => {
-            moveNextPage(Directions.NEXT);
-          }}
-          previous={() => {
-            moveNextPage(Directions.PREVIOUS);
-          }}
-        />
+      {showConstrols && (
+        <>
+          {leftConrtol || (
+            <div
+              onClick={() => {
+                moveNextPage(Directions.NEXT);
+              }}
+              className={`${styles.controls}  ${styles.controlLeft}`}
+            >
+              &lt;
+            </div>
+          )}
+          {rightConrtol || (
+            <div
+              onClick={() => {
+                moveNextPage(Directions.PREVIOUS);
+              }}
+              className={`${styles.controls} ${styles.controlRight}`}
+            >
+              &gt;
+            </div>
+          )}
+        </>
       )}
     </div>
   );
