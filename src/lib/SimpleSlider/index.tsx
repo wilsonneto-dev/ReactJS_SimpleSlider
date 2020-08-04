@@ -134,13 +134,11 @@ const SimpleSlider: React.FC<ISimpleSliderProps> = ({
   }, [currentLeftPosition, getMovementAreaInfo]);
 
   useEffect(() => {
-    console.log("useEffect:currentLeftPosition -> " + currentLeftPosition);
     processPostMovementUI();
     updateMovementPercentual();
   }, [currentLeftPosition, processPostMovementUI, updateMovementPercentual]);
 
   useEffect(() => {
-    console.log(currentPercentualPosition);
     if (onChangePercentPosition)
       onChangePercentPosition(currentPercentualPosition);
   }, [currentPercentualPosition, onChangePercentPosition]);
