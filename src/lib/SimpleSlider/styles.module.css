@@ -1,6 +1,8 @@
 .container {
   position: relative;
   width: 100%;
+  overflow-x: hidden;
+  padding: 10px 0;
 }
 
 .container .content {
