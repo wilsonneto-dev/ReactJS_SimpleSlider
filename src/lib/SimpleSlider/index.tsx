@@ -15,16 +15,16 @@ enum Directions {
 
 interface ISimpleSliderProps {
   showConstrols?: boolean;
-  leftConrtol?: Component;
-  rightConrtol?: Component;
+  LeftConrtol?: Component;
+  RightConrtol?: Component;
   onChangePercentPosition?: (positionPercent: number) => void;
 }
 
 const SimpleSlider: React.FC<ISimpleSliderProps> = ({
   children,
   showConstrols = true,
-  leftConrtol = null,
-  rightConrtol = null,
+  LeftConrtol = null,
+  RightConrtol = null,
   onChangePercentPosition = null,
 }) => {
   const containerRef = useRef<HTMLDivElement>();
@@ -37,47 +37,53 @@ const SimpleSlider: React.FC<ISimpleSliderProps> = ({
   const [currentPercentualPosition, setCurrentPercentualPosition] = useState(0);
   const [onDragging, setOnDragging] = useState(false);
 
-  const moveNextPage = useCallback((direction: Directions) => {
-    if (containerRef.current && contentRef.current) {
-      const containerWidth = containerRef.current?.offsetWidth;
-      const contentWidth = contentRef.current?.clientWidth;
-      const totalMovimentArea = contentWidth - containerWidth;
-      const nextPageLeftMoviment = containerWidth * 0.8;
+  const getMovementAreaInfo = useCallback(() => {
+    const containerWidth = containerRef.current?.offsetWidth ?? 0;
+    const contentWidth = contentRef.current?.clientWidth ?? 0;
+    const totalMovementArea = contentWidth - containerWidth;
+    const nextPageMovementInPixels = containerWidth * 0.8;
 
-      setCurrentLeftPosition((_currentLeftPosition) => {
-        let newPosition = 0;
-        if (direction === Directions.NEXT) {
-          newPosition = _currentLeftPosition - nextPageLeftMoviment;
-          if (newPosition < totalMovimentArea * -1)
-            newPosition = totalMovimentArea * -1;
-        } else {
-          newPosition = _currentLeftPosition + nextPageLeftMoviment;
-          if (newPosition > 0) newPosition = 0;
-        }
-
-        setCurrentPercentualPosition(newPosition / totalMovimentArea);
-        return newPosition;
-      });
-    }
+    return { totalMovementArea, nextPageMovementInPixels };
   }, []);
 
-  const processPostMovmentUI = useCallback(() => {
-    if (contentRef.current) {
-      const containerWidth = containerRef.current?.offsetWidth ?? 0;
-      const contentWidth = contentRef.current?.clientWidth ?? 0;
-      const totalMovimentArea = contentWidth - containerWidth;
+  const moveNextPage = useCallback(
+    (direction: Directions) => {
+      if (containerRef.current && contentRef.current) {
+        const {
+          totalMovementArea,
+          nextPageMovementInPixels,
+        } = getMovementAreaInfo();
 
-      if (currentLeftPosition < totalMovimentArea * -1)
-        setCurrentLeftPosition(totalMovimentArea * -1);
+        setCurrentLeftPosition((_currentLeftPosition) => {
+          let newPosition = 0;
+          if (direction === Directions.NEXT) {
+            newPosition = _currentLeftPosition - nextPageMovementInPixels;
+            if (newPosition < totalMovementArea * -1)
+              newPosition = totalMovementArea * -1;
+          } else {
+            newPosition = _currentLeftPosition + nextPageMovementInPixels;
+            if (newPosition > 0) newPosition = 0;
+          }
+          return newPosition;
+        });
+      }
+    },
+    [getMovementAreaInfo]
+  );
+
+  const processPostMovementUI = useCallback(() => {
+    const { totalMovementArea } = getMovementAreaInfo();
+    if (contentRef.current) {
+      if (currentLeftPosition < totalMovementArea * -1)
+        setCurrentLeftPosition(totalMovementArea * -1);
       else if (currentLeftPosition > 0) setCurrentLeftPosition(0);
     }
-  }, [currentLeftPosition]);
+  }, [currentLeftPosition, getMovementAreaInfo]);
 
   const dragStart = useCallback((e: any) => {
     if (containerRef.current && contentRef.current) {
       const event = (e || window.event) as DragEvent;
       setOnDragging(true);
-
       setInitialDragOffsetLeft(contentRef.current.offsetLeft);
       setInitialDragEventX(event.clientX);
     }
@@ -87,8 +93,8 @@ const SimpleSlider: React.FC<ISimpleSliderProps> = ({
     (e: any) => {
       if (containerRef.current && contentRef.current) {
         const event = (e || window.event) as DragEvent;
-        const movmentOffset = event.clientX - initialDragEventX;
-        const newContentPosition = initialDragOffsetLeft + movmentOffset;
+        const movementOffset = event.clientX - initialDragEventX;
+        const newContentPosition = initialDragOffsetLeft + movementOffset;
 
         setCurrentLeftPosition(newContentPosition);
         setOnDragging(false);
@@ -111,8 +117,8 @@ const SimpleSlider: React.FC<ISimpleSliderProps> = ({
       if (containerRef.current && contentRef.current) {
         const event = (e || window.event) as DragEvent;
         if (e.clientX !== 0) {
-          const movmentOffset = event.clientX - initialDragEventX;
-          const newContentPosition = initialDragOffsetLeft + movmentOffset;
+          const movementOffset = event.clientX - initialDragEventX;
+          const newContentPosition = initialDragOffsetLeft + movementOffset;
           updateLeftContentPosition(newContentPosition);
         }
       }
@@ -120,12 +126,21 @@ const SimpleSlider: React.FC<ISimpleSliderProps> = ({
     [initialDragEventX, initialDragOffsetLeft, updateLeftContentPosition]
   );
 
-  useEffect(() => {
-    console.log("useEffect:currentLeftPosition -> " + currentLeftPosition);
-    processPostMovmentUI();
-  }, [currentLeftPosition, processPostMovmentUI]);
+  const updateMovementPercentual = useCallback(() => {
+    const { totalMovementArea } = getMovementAreaInfo();
+    setCurrentPercentualPosition(
+      (currentLeftPosition * -1) / totalMovementArea
+    );
+  }, [currentLeftPosition, getMovementAreaInfo]);
 
   useEffect(() => {
+    console.log("useEffect:currentLeftPosition -> " + currentLeftPosition);
+    processPostMovementUI();
+    updateMovementPercentual();
+  }, [currentLeftPosition, processPostMovementUI, updateMovementPercentual]);
+
+  useEffect(() => {
+    console.log(currentPercentualPosition);
     if (onChangePercentPosition)
       onChangePercentPosition(currentPercentualPosition);
   }, [currentPercentualPosition, onChangePercentPosition]);
@@ -147,24 +162,27 @@ const SimpleSlider: React.FC<ISimpleSliderProps> = ({
       </div>
       {showConstrols && (
         <>
-          {leftConrtol || (
-            <div
-              onClick={() => {
-                moveNextPage(Directions.NEXT);
-              }}
-              className={`${styles.controls}  ${styles.controlLeft}`}
-            >
-              &lt;
-            </div>
-          )}
-          {rightConrtol || (
+          {currentPercentualPosition > 0.0 && (
             <div
               onClick={() => {
                 moveNextPage(Directions.PREVIOUS);
               }}
+              className={`${styles.controls}  ${styles.controlLeft}`}
+            >
+              {LeftConrtol || <div className={styles.defaultControl}>&lt;</div>}
+            </div>
+          )}
+
+          {currentPercentualPosition < 0.99 && (
+            <div
+              onClick={() => {
+                moveNextPage(Directions.NEXT);
+              }}
               className={`${styles.controls} ${styles.controlRight}`}
             >
-              &gt;
+              {RightConrtol || (
+                <div className={styles.defaultControl}>&gt;</div>
+              )}
             </div>
           )}
         </>

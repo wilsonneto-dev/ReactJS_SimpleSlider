@@ -14,25 +14,30 @@
 }
 
 .container .controls {
+  transition: all 0.5s;
   opacity: 0;
-  cursor: pointer;
-  display: flex;
-  place-content: center;
-  align-items: center;
   position: absolute;
+  cursor: pointer;
   top: 0;
   left: 0;
   height: 100%;
-  width: 20px;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: white;
+}
+
+.container .controls.controlRight {
+  left: auto;
+  right: 0;
 }
 
 .container:hover .controls {
   opacity: 0.8;
 }
 
-.container .controls.controlRight {
-  left: auto;
-  right: 0;
+.container .controls .defaultControl {
+  display: flex;
+  height: 100%;
+  place-content: center;
+  align-items: center;
+  width: 20px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
 }
