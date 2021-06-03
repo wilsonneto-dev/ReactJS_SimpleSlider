@@ -3,7 +3,7 @@ import Home from "./components/Home";
 
 const App: React.FC = () => (
   <div>
-    <Home />
+    just testing
   </div>
 );
 
